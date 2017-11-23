@@ -12,7 +12,7 @@ class ApiController extends Controller
         $this->middleware('auth:api');
     }
 
-    public function login()
+    public function signup()
     {
         dd('login');
     }
