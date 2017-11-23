@@ -2,91 +2,136 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\ApiResponse;
+use App\Models\User;
+use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
+use Laravel\Passport\Client;
 
 class UserController extends Controller
 {
+    use ApiResponse,AuthenticatesUsers;
     public function __construct()
     {
-        $this->middleware('auth:api',[
-           'excepc'=>['create','show','store']
+        $this->middleware('auth:api')
+            ->except('login','create');
+    }
+
+    //注册
+    public function create(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|between:5,32',
         ]);
+
+        if ($validator->fails()) {
+            $request->request->add([
+                'errors' => $validator->errors()->toArray(),
+                'code' => 401,
+            ]);
+            return $this->setStatusCode($request['code'])->failed($request['errors']);
+        }
+        $user=User::create([
+            'email'=>$request->email,
+            'password'=>bcrypt($request->password),
+        ]);
+        if(!$user){
+            return $this->failed('注册失败');
+        }
+        //发送邮件
+        $this->sendEmailConfirmationTo($user);
+        //生成token
+        $response=$this->authenticateClient($request);
+
+        return $this->success($response);
     }
 
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index()
+    //登录
+    public function login(Request $request)
     {
-        echo 'index';
+
+        $validator = Validator::make($request->all(), [
+            'email'    => 'required|email',
+            'password' => 'required|between:5,32',
+        ]);
+
+        if ($validator->fails()) {
+            $request->request->add([
+                'errors' => $validator->errors()->toArray(),
+                'code' => 401,
+            ]);
+            return $this->setStatusCode($request['code'])->failed($request['errors']);
+        }
+        //拿到帐号密码
+        $credentials = $this->credentials($request);
+        //判断是否登录成功
+        if($this->guard('api')->attempt($credentials)){
+            if(!Auth::user()->activated){
+                return $this->failed('当前用户邮件未激活',401);
+            }
+            $token=$this->authenticateClient($request);
+            return $this->success($token);
+        }
+        return $this->failed('用户或者密码错误');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
+
+
+
+    public function show(Request $request)
     {
-        echo 'create';
+        dd(Auth::user());
+        dd('show');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        echo 'show';
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
     public function update(Request $request, $id)
     {
-        //
+        dd('update');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+
+    /**调用认证接口获取授权码
+     * @param Request $request
+     * @return data  授权码数据
      */
-    public function destroy($id)
+    protected function authenticateClient(Request $request)
     {
-        //
+        // 个人感觉通过.env配置太复杂，直接从数据库查更方便
+        $password_client = Client::query()->where('password_client',1)->latest()->first();
+
+        $http = new  \GuzzleHttp\Client();
+        $response = $http->post(config('app.url').'/oauth/token', [
+            'form_params' => [
+                'grant_type' => 'password',
+                'client_id' => $password_client->id,
+                'client_secret' => $password_client->secret,
+                'username' => $request->email,
+                'password' => $request->password,
+                'scope' => '',
+            ],
+        ]);
+        return json_decode((string) $response->getBody(), true);
     }
+
+    //发送注册邮件
+    public function sendEmailConfirmationTo($user)
+    {
+        $view="emails.confirm";
+        $data=compact('user');
+        $from=config('mail.from.address');
+        $name=config('mail.from.name');
+        $to=$user->email;
+        $subject='感谢注册简叔！请确认你的邮箱。';
+
+        Mail::send($view,$data,function($message)use($from,$name,$to,$subject){
+            $message->from($from,$name)->to($to)->subject($subject);
+        });
+
+    }
+
 }
