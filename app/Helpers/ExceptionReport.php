@@ -26,10 +26,15 @@ class ExceptionReport
     }
 
     public $doReport = [
-        AuthenticationException::class => ['未授权',401],
-        ModelNotFoundException::class => ['该模型未找到',404],
-        MethodNotAllowedHttpException::class=>['该方法未经允许',404],
-        NotFoundHttpException::class=>['该页面不存在',404],
+//        AuthenticationException::class => ['未授权',401],
+//        ModelNotFoundException::class => ['该模型未找到',404],
+//        MethodNotAllowedHttpException::class=>['该方法未经允许',404],
+//        NotFoundHttpException::class=>['该页面不存在',404],
+
+        AuthenticationException::class => ['You don\'t have permission to access',403],
+        ModelNotFoundException::class => [' Model Not Found',401],
+        MethodNotAllowedHttpException::class=>['Method Not Allowed',401],
+        NotFoundHttpException::class=>['Not Found',404],
     ];
 
     public function shouldReturn(){
