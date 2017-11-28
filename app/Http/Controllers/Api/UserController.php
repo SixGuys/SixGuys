@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Helpers\ApiResponse;
+use App\Models\Category;
 use App\Models\User;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class UserController extends Controller
     public function __construct()
     {
         $this->middleware('auth:api')
-            ->except('login','create');
+            ->except('login','create','refreshToken');
     }
 
     //注册
@@ -96,7 +97,8 @@ class UserController extends Controller
 
 
     /**调用认证接口获取授权码
-     * @param Request $request
+     * @param Request email
+     * @param Request password
      * @return data  授权码数据
      */
     protected function authenticateClient(Request $request)
@@ -115,6 +117,28 @@ class UserController extends Controller
                 'scope' => '',
             ],
         ]);
+        return json_decode((string) $response->getBody(), true);
+    }
+
+    /**刷新授权码
+     * @param Request refresh_token
+     * @return mixed
+     */
+    public function refreshToken(Request $request)
+    {
+        $password_client = Client::query()->where('password_client',1)->latest()->first();
+
+        $http = new  \GuzzleHttp\Client();
+        $response = $http->post(config('app.url').'/oauth/token', [
+            'form_params' => [
+                'grant_type' => 'refresh_token',
+                'refresh_token' => $request->refresh_token,
+                'client_id' => $password_client->id,
+                'client_secret' => $password_client->secret,
+                'scope' => '',
+            ],
+        ]);
+
         return json_decode((string) $response->getBody(), true);
     }
 
