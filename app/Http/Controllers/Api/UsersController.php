@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Helpers\ApiResponse;
-use App\Models\Category;
 use App\Models\User;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
@@ -13,7 +12,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Laravel\Passport\Client;
 
-class UserController extends Controller
+class UsersController extends Controller
 {
     use ApiResponse,AuthenticatesUsers;
     public function __construct()
@@ -72,6 +71,7 @@ class UserController extends Controller
         $credentials = $this->credentials($request);
         //判断是否登录成功
         if($this->guard('api')->attempt($credentials)){
+            //邮箱是否激活
             if(!Auth::user()->activated){
                 return $this->failed('当前用户邮件未激活',401);
             }
@@ -81,18 +81,19 @@ class UserController extends Controller
         return $this->failed('用户或者密码错误');
     }
 
-
-
-
-    public function show(Request $request)
+    //查看个人信息 GET
+    public function show(User $user)
     {
-        dd(Auth::user());
-        dd('show');
+        return $this->success($user->toArray());
     }
 
-    public function update(Request $request, $id)
+    //更新个人信息 put
+    public function update(User $user,Request $request)
     {
-        dd('update');
+        $this->authorize('update',$user);
+        $user->email=$request->email;
+        $user->save();
+        return $this->message('修改成功!');
     }
 
 

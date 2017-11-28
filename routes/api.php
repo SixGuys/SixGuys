@@ -15,13 +15,12 @@
 
 Route::group(['namespace'=>'Api'],function(){
     //注册登录
-    Route::post('users/login','UserController@login')->name('login');
-    Route::post('users/create','UserController@create')->name('register');
+    Route::post('users/login','UsersController@login')->name('login');
+    Route::post('users/create','UsersController@create')->name('register');
     //刷新token
-    Route::post('refresh_token','UserController@refreshToken')->name('refresh.token');
-
-    Route::post('users/show','UserController@show')->name('users.show');
-    Route::post('users/update','UserController@update')->name('users.update');
+    Route::post('refresh_token','UsersController@refreshToken')->name('refresh.token');
+    //查看和更新
+    Route::resource('users','UsersController',['only'=>['show','update']]);
 
 });
 
